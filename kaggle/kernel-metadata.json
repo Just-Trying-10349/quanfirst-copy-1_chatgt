@@ -1,0 +1,11 @@
+{
+    "id": "wanobim/quant-research",
+    "title": "Quant Research Automation",
+    "code_file": "kaggle_runner.py",
+    "language": "python",
+    "kernel_type": "script",
+    "is_private": "true",
+    "enable_gpu": "false",
+    "enable_internet": "true",
+    "machine_shape": ""
+}
