@@ -1,0 +1,464 @@
+name: Quant Research - GitHub to Kaggle
+
+on:
+
+  # Run automatically whenever code is pushed.
+  push:
+    branches:
+      - main
+
+  # Also allow manual execution from:
+  # GitHub → Actions → Quant Research - GitHub to Kaggle
+  workflow_dispatch:
+
+
+# ============================================================
+# PERMISSIONS
+# ============================================================
+
+permissions:
+  contents: write
+
+
+# ============================================================
+# JOB
+# ============================================================
+
+jobs:
+
+  kaggle-research:
+
+    name: Run Quant Research on Kaggle
+
+    runs-on: ubuntu-latest
+
+
+    steps:
+
+      # ======================================================
+      # 1. GET THE GITHUB REPOSITORY
+      # ======================================================
+
+      - name: 1 - Checkout GitHub repository
+
+        uses: actions/checkout@v5
+
+
+      # ======================================================
+      # 2. INSTALL PYTHON
+      # ======================================================
+
+      - name: 2 - Setup Python
+
+        uses: actions/setup-python@v6
+
+        with:
+          python-version: "3.12"
+
+
+      # ======================================================
+      # 3. DISPLAY REPOSITORY
+      # ======================================================
+
+      - name: 3 - Display repository structure
+
+        run: |
+
+          echo "=========================================="
+          echo "GITHUB REPOSITORY"
+          echo "=========================================="
+
+          find . -maxdepth 3 -type f | sort
+
+
+      # ======================================================
+      # 4. RUN LOCAL GITHUB TEST
+      # ======================================================
+      #
+      # This proves hello.py works inside GitHub Actions
+      # before we send it to Kaggle.
+      #
+      # ======================================================
+
+      - name: 4 - Test hello.py in GitHub Actions
+
+        run: |
+
+          echo "=========================================="
+          echo "TESTING HELLO.PY"
+          echo "=========================================="
+
+          python hello.py
+
+
+      # ======================================================
+      # 5. INSTALL KAGGLE CLI
+      # ======================================================
+
+      - name: 5 - Install Kaggle CLI
+
+        run: |
+
+          python -m pip install --upgrade pip
+
+          python -m pip install --upgrade kaggle
+
+          echo "Kaggle CLI version:"
+          kaggle --version
+
+
+      # ======================================================
+      # 6. AUTHENTICATE WITH KAGGLE
+      # ======================================================
+      #
+      # IMPORTANT:
+      #
+      # KAGGLE_API_TOKEN comes from:
+      #
+      # GitHub
+      # → Settings
+      # → Secrets and variables
+      # → Actions
+      #
+      # We NEVER print the token.
+      #
+      # ======================================================
+
+      - name: 6 - Configure Kaggle authentication
+
+        env:
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+
+        run: |
+
+          if [ -z "$KAGGLE_API_TOKEN" ]; then
+
+            echo "ERROR: KAGGLE_API_TOKEN is not configured."
+
+            exit 1
+
+          fi
+
+          echo "KAGGLE_API_TOKEN is available."
+
+          # The modern Kaggle CLI accepts the token through
+          # the KAGGLE_API_TOKEN environment variable.
+
+          export KAGGLE_API_TOKEN="$KAGGLE_API_TOKEN"
+
+          echo "Kaggle authentication environment prepared."
+
+
+      # ======================================================
+      # 7. PREPARE KAGGLE EXECUTION PACKAGE
+      # ======================================================
+      #
+      # We create a temporary directory containing:
+      #
+      # kaggle_runner.py
+      # hello.py
+      # parameters.json
+      # leaderboard.csv
+      # experiments/
+      #
+      # The Kaggle notebook/kernel receives this package.
+      #
+      # ======================================================
+
+      - name: 7 - Prepare Kaggle package
+
+        run: |
+
+          echo "=========================================="
+          echo "PREPARING KAGGLE PACKAGE"
+          echo "=========================================="
+
+          rm -rf kaggle_upload
+
+          mkdir -p kaggle_upload
+
+
+          # ----------------------------------------------
+          # Kaggle execution files
+          # ----------------------------------------------
+
+          cp kaggle/kaggle_runner.py \
+             kaggle_upload/kaggle_runner.py
+
+          cp kaggle/kernel-metadata.json \
+             kaggle_upload/kernel-metadata.json
+
+
+          # ----------------------------------------------
+          # Main GitHub program
+          # ----------------------------------------------
+
+          cp hello.py \
+             kaggle_upload/hello.py
+
+
+          # ----------------------------------------------
+          # Configuration
+          # ----------------------------------------------
+
+          if [ -f parameters.json ]; then
+
+            cp parameters.json \
+               kaggle_upload/parameters.json
+
+          fi
+
+
+          # ----------------------------------------------
+          # Leaderboard
+          # ----------------------------------------------
+
+          if [ -f leaderboard.csv ]; then
+
+            cp leaderboard.csv \
+               kaggle_upload/leaderboard.csv
+
+          fi
+
+
+          # ----------------------------------------------
+          # Experiments
+          # ----------------------------------------------
+
+          if [ -d experiments ]; then
+
+            cp -r experiments \
+               kaggle_upload/experiments
+
+          fi
+
+
+          # ----------------------------------------------
+          # Future research directories
+          # ----------------------------------------------
+
+          if [ -d strategies ]; then
+
+            cp -r strategies \
+               kaggle_upload/strategies
+
+          fi
+
+
+          if [ -d research ]; then
+
+            cp -r research \
+               kaggle_upload/research
+
+          fi
+
+
+          echo ""
+          echo "Kaggle package:"
+          echo ""
+
+          find kaggle_upload -type f | sort
+
+
+      # ======================================================
+      # 8. SHOW METADATA
+      # ======================================================
+
+      - name: 8 - Verify Kaggle metadata
+
+        run: |
+
+          echo "=========================================="
+          echo "KAGGLE METADATA"
+          echo "=========================================="
+
+          cat kaggle_upload/kernel-metadata.json
+
+
+      # ======================================================
+      # 9. PUSH TO KAGGLE
+      # ======================================================
+      #
+      # This is the actual GitHub → Kaggle connection.
+      #
+      # ======================================================
+
+      - name: 9 - Push research job to Kaggle
+
+        env:
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+
+        run: |
+
+          echo "=========================================="
+          echo "PUSHING TO KAGGLE"
+          echo "=========================================="
+
+          kaggle kernels push \
+            -p kaggle_upload
+
+
+      # ======================================================
+      # 10. WAIT FOR KAGGLE
+      # ======================================================
+
+      - name: 10 - Wait for Kaggle execution
+
+        env:
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+
+        run: |
+
+          echo "=========================================="
+          echo "WAITING FOR KAGGLE"
+          echo "=========================================="
+
+          KERNEL_ID="YOUR_KAGGLE_USERNAME/quant-research"
+
+          MAX_ATTEMPTS=30
+
+          ATTEMPT=1
+
+
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]
+
+          do
+
+            echo ""
+            echo "------------------------------------------"
+            echo "Attempt $ATTEMPT of $MAX_ATTEMPTS"
+            echo "------------------------------------------"
+
+            STATUS_OUTPUT=$(kaggle kernels status "$KERNEL_ID" 2>&1 || true)
+
+            echo "$STATUS_OUTPUT"
+
+
+            if echo "$STATUS_OUTPUT" | grep -qi "complete"; then
+
+              echo ""
+              echo "Kaggle execution completed."
+
+              break
+
+            fi
+
+
+            if echo "$STATUS_OUTPUT" | grep -qi "error"; then
+
+              echo ""
+              echo "Kaggle execution reported an error."
+
+              exit 1
+
+            fi
+
+
+            echo "Kaggle is still running..."
+
+            sleep 20
+
+            ATTEMPT=$((ATTEMPT + 1))
+
+          done
+
+
+      # ======================================================
+      # 11. DOWNLOAD KAGGLE OUTPUT
+      # ======================================================
+
+      - name: 11 - Download Kaggle results
+
+        env:
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+
+        run: |
+
+          echo "=========================================="
+          echo "DOWNLOADING KAGGLE OUTPUT"
+          echo "=========================================="
+
+          KERNEL_ID="YOUR_KAGGLE_USERNAME/quant-research"
+
+          rm -rf kaggle_output
+
+          mkdir -p kaggle_output
+
+
+          kaggle kernels output \
+            "$KERNEL_ID" \
+            -p kaggle_output \
+            -o
+
+
+      # ======================================================
+      # 12. DISPLAY RESULTS IN GITHUB ACTIONS
+      # ======================================================
+
+      - name: 12 - Display Kaggle results
+
+        run: |
+
+          echo "=========================================="
+          echo "KAGGLE RESULTS"
+          echo "=========================================="
+
+          if [ -d kaggle_output ]; then
+
+            find kaggle_output -type f -print
+
+          else
+
+            echo "No Kaggle output directory found."
+
+          fi
+
+
+      # ======================================================
+      # 13. SAVE KAGGLE RESULTS AS GITHUB ARTIFACT
+      # ======================================================
+
+      - name: 13 - Upload Kaggle results to GitHub Actions
+
+        uses: actions/upload-artifact@v4
+
+        with:
+
+          name: kaggle-results
+
+          path: kaggle_output/
+
+          if-no-files-found: warn
+
+
+      # ======================================================
+      # 14. FINAL MESSAGE
+      # ======================================================
+
+      - name: 14 - Final status
+
+        run: |
+
+          echo ""
+          echo "================================================"
+          echo "QUANT RESEARCH PIPELINE COMPLETE"
+          echo "================================================"
+
+          echo ""
+          echo "GitHub:"
+          echo "  Source code"
+
+          echo ""
+          echo "GitHub Actions:"
+          echo "  Orchestration"
+
+          echo ""
+          echo "Kaggle:"
+          echo "  Remote execution"
+
+          echo ""
+          echo "Kaggle results:"
+          echo "  Downloaded back to GitHub Actions"
+
+          echo ""
+          echo "================================================"
