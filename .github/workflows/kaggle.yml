@@ -313,7 +313,7 @@ jobs:
           echo "WAITING FOR KAGGLE"
           echo "=========================================="
 
-          KERNEL_ID="YOUR_KAGGLE_USERNAME/quant-research"
+          KERNEL_ID="wanobim/quant-research"
 
           MAX_ATTEMPTS=30
 
@@ -378,7 +378,7 @@ jobs:
           echo "DOWNLOADING KAGGLE OUTPUT"
           echo "=========================================="
 
-          KERNEL_ID="YOUR_KAGGLE_USERNAME/quant-research"
+          KERNEL_ID="wanobim/quant-research"
 
           rm -rf kaggle_output
 
